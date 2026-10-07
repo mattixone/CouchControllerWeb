@@ -1,0 +1,11 @@
+# Add these to the settings.toml already on CIRCUITPY (don't commit the real one).
+
+# Windows PIN or password typed by UNLOCK. Leave out to disable the button.
+COUCH_UNLOCK_SECRET = "1234"
+
+# Press Enter after typing it. Default: only when the secret isn't all digits
+# (a Windows Hello PIN signs in by itself).
+# COUCH_UNLOCK_ENTER = "1"
+
+# Let guests use the POWER menu (sleep / lock / restart / shut down).
+COUCH_WEB_POWER = "1"
