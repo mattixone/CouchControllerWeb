@@ -1,14 +1,24 @@
 # Couch Controller Web
 
 A phone remote for the Beelink that guests can use from a browser, in the same
-CRT style as the Retroid app. Couch Launcher on the Beelink serves the page;
-the phone then sends commands over a WebSocket to the same Pico 2 W the
-Retroid uses, and the Pico turns them into USB keyboard, mouse and media keys.
+CRT style as the Retroid app. Couch Launcher on the Beelink serves the page,
+and the phone sends its button presses over a WebSocket to whichever of these
+answers:
+
+- **The Pico 2 W** (once it runs `pico/couch_web.py`): turns them into USB
+  keyboard, mouse and media keys. Works everywhere, including UNLOCK at the
+  Windows lock screen.
+- **Couch Launcher itself**: presses the keys from Windows. Works with no Pico
+  changes; everything except UNLOCK, which Windows blocks for apps.
 
 ```
-phone ──① http://<beelink-ip>──────▶ Couch Launcher (page only)
-      ──② ws://<pico>/ws (JSON)────▶ Pico 2 W ──USB HID──▶ Beelink
+phone ──http://<beelink-ip>────────▶ Couch Launcher (page; keys if no Pico)
+      ──ws://<pico>/ws (JSON)──────▶ Pico 2 W ──USB HID──▶ Beelink
 ```
+
+The status line shows `LINKED PICO` or `LINKED PC`. The launcher checks for the
+Pico in the background and tells the page to try it first once it answers.
+None of this touches the Retroid's link to the Pico.
 
 The Pico can serve the page itself too, at `http://couchcommander.local`.
 That's the fallback for when the Beelink is asleep (the launcher can't serve
@@ -60,8 +70,10 @@ can't do https, which is why the page comes from a machine on the home network.
 **How the page finds the Pico**, first that applies:
 1. An address typed into SETUP (or `?host=` in the URL).
 2. Served by Couch Launcher: the addresses it writes into the page's
-   `couch-pico` tag, the Pico's IP first, then `couchcommander.local`. If one
-   doesn't answer, the page tries the next.
+   `couch-pico` tag, in the order to try them: the Pico (IP, then
+   `couchcommander.local`) and `@self`, the launcher. Pico first only once the
+   launcher has seen it answer. If one doesn't connect within a few seconds,
+   the page tries the next.
 3. Served by the Pico: the Pico itself.
 
 ## Controls
