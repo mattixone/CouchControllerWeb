@@ -1,20 +1,24 @@
 # Couch Controller Web
 
 A phone remote for the Beelink that guests can use from a browser, in the same
-CRT style as the Retroid app. It talks to the same Pico 2 W: the Pico serves
-the page, the phone sends commands back over a WebSocket, and the Pico turns
-them into USB keyboard, mouse and media keys.
+CRT style as the Retroid app. Couch Launcher on the Beelink serves the page;
+the phone then sends commands over a WebSocket to the same Pico 2 W the
+Retroid uses, and the Pico turns them into USB keyboard, mouse and media keys.
 
 ```
-phone browser ──http://couchcommander.local──▶ Pico 2 W ──USB HID──▶ Beelink
-              ◀──────── ws://…/ws (JSON) ─────▶
+phone ──① http://<beelink-ip>──────▶ Couch Launcher (page only)
+      ──② ws://<pico>/ws (JSON)────▶ Pico 2 W ──USB HID──▶ Beelink
 ```
+
+The Pico can serve the page itself too, at `http://couchcommander.local`.
+That's the fallback for when the Beelink is asleep (the launcher can't serve
+anything then, but the Pico can, and a keypress wakes the PC).
 
 ## What's here
 
 | Path | What it is |
 |---|---|
-| `www/index.html` | The whole web app: one file, no build step, no internet needed |
+| `www/index.html` | The whole web app: one file, no build step, no internet needed. Couch Launcher ships a copy of it |
 | `pico/couch_web.py` | CircuitPython module: serves the page, handles the WebSocket |
 | `pico/code_example.py` | How to wire it into the existing `code.py` (3 lines) |
 | `pico/settings.toml.example` | Unlock secret and the power-menu switch |
@@ -29,10 +33,18 @@ python3 tools/mock_pico.py
 Open the address it prints on your phone (same Wi-Fi). Every button press is
 printed in the terminal. Nothing to install, just Python 3.
 
-## Putting it on the Pico
+## Setting it up
 
-1. Copy `www/index.html` to `CIRCUITPY/www/index.html`.
-2. Copy `pico/couch_web.py` to `CIRCUITPY/`.
+**Beelink:** nothing to do beyond updating Couch Launcher. It serves the page
+from the next release; Settings › PHONE REMOTE shows the QR code and address
+for guests. Allow it through Windows Firewall when asked (see the
+[launcher README](https://github.com/mattixone/couch-launcher#phone-remote)).
+
+**Pico:**
+
+1. Copy `pico/couch_web.py` to `CIRCUITPY/`.
+2. Optional, for the asleep-Beelink fallback: copy `www/index.html` to
+   `CIRCUITPY/www/index.html`. (Without it, only the launcher serves the page.)
 3. Make sure `CIRCUITPY/lib` has `adafruit_httpserver` (4.x) and `adafruit_hid`
    (from the CircuitPython bundle, or `circup install adafruit_httpserver`).
 4. Add the three marked lines from `pico/code_example.py` to `code.py`, reusing
@@ -40,12 +52,17 @@ printed in the terminal. Nothing to install, just Python 3.
    servers run in the same loop, so the Retroid's must not block (use a 0 or
    short timeout on its sockets).
 5. Add the settings from `pico/settings.toml.example` to `settings.toml`.
-6. Guests open **http://couchcommander.local** (or the Pico's IP; some
-   Android phones don't resolve `.local`). A QR code on the fridge helps.
 
 The page has to be loaded over `http://`. Browsers block an `https://` page
 (e.g. GitHub Pages) from opening a plain `ws://` connection, and the Pico
-can't do https. That's the main reason the Pico serves the page itself.
+can't do https, which is why the page comes from a machine on the home network.
+
+**How the page finds the Pico**, first that applies:
+1. An address typed into SETUP (or `?host=` in the URL).
+2. Served by Couch Launcher: the addresses it writes into the page's
+   `couch-pico` tag, the Pico's IP first, then `couchcommander.local`. If one
+   doesn't answer, the page tries the next.
+3. Served by the Pico: the Pico itself.
 
 ## Controls
 
@@ -114,3 +131,6 @@ home:
   behaves. If the Retroid already has a working sequence, copy that into
   `_unlock`.
 - The Win+X → U → S/R/U power sequence works on this Windows build.
+- Couch Launcher's web server is tested (run on Linux, serving the page to a
+  browser that then drove the mock Pico), but the launcher hasn't been built
+  with the .NET SDK or run on Windows with it yet.

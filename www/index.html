@@ -7,6 +7,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#000000">
+<!-- Filled in by Couch Launcher when it serves this page: where the Pico is. -->
+<meta name="couch-pico" content="">
 <title>Couch Commander</title>
 <style>
 /* Colours come from the same theme list as the Retroid app and Couch Launcher. */
@@ -450,13 +452,23 @@ function log(text) {
 }
 
 /* ---------------- link to the Pico ---------------- */
-// Served by the Pico: talk back to whoever served the page.
-// Opened from anywhere else (a file, a laptop dev server): use SETUP's address.
+// Where the Pico is, best guess first:
+// - SETUP's address (or ?host=), when someone has set one
+// - served by Couch Launcher: the addresses it wrote in (IP, then .local name)
+// - served by the Pico itself: whoever served the page
+function hostCandidates() {
+  if (params.get("host")) return [params.get("host")];
+  if (settings.host) return [settings.host];
+  const fromLauncher = document.querySelector('meta[name="couch-pico"]')?.content || "";
+  const listed = fromLauncher.split(",").map((s) => s.trim()).filter(Boolean);
+  if (listed.length) return listed;
+  if (location.protocol === "http:" && location.host) return [location.host];
+  return [CONFIG.defaultHost];
+}
+let hostIndex = 0;
 function targetHost() {
-  if (params.get("host")) return params.get("host");
-  if (settings.host) return settings.host;
-  if (location.protocol === "http:" && location.host) return location.host;
-  return CONFIG.defaultHost;
+  const all = hostCandidates();
+  return all[hostIndex % all.length];
 }
 
 let ws = null, linked = false, retryMs = 1000, retryTimer = 0, pingTimer = 0;
@@ -487,7 +499,9 @@ function connect() {
   try { sock = new WebSocket(`ws://${host}${CONFIG.wsPath}`); }
   catch (e) { log("BAD ADDRESS"); setLink("down", host); return; }
   ws = sock;
+  let opened = false;
   sock.onopen = () => {
+    opened = true;
     retryMs = 1000;
     setLink("up", host);
     log("LINK ESTABLISHED");
@@ -510,6 +524,8 @@ function connect() {
     ws = null;
     if (linked) log("LINK LOST");
     setLink("down", host);
+    // Never got through: try the next address next time.
+    if (!opened) hostIndex++;
     retryTimer = setTimeout(connect, retryMs);
     retryMs = Math.min(retryMs * 2, 10000);
   };
@@ -842,6 +858,7 @@ $("setConnect").addEventListener("click", () => {
   settings.host = $("setHost").value.trim().replace(/^\w+:\/\//, "").replace(/\/.*$/, "");
   saveSettings();
   retryMs = 1000;
+  hostIndex = 0;
   connect();
   closeSheets();
 });
