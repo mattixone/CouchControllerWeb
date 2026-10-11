@@ -20,18 +20,14 @@ The status line shows `LINKED PICO` or `LINKED PC`. The launcher checks for the
 Pico in the background and tells the page to try it first once it answers.
 None of this touches the Retroid's link to the Pico.
 
-The Pico can serve the page itself too, at `http://couchcommander.local`.
-That's the fallback for when the Beelink is asleep (the launcher can't serve
-anything then, but the Pico can, and a keypress wakes the PC).
-
 ## What's here
 
 | Path | What it is |
 |---|---|
 | `www/index.html` | The whole web app: one file, no build step, no internet needed. Couch Launcher ships a copy of it |
-| `pico/couch_web.py` | CircuitPython module: serves the page, handles the WebSocket |
-| `pico/code_example.py` | How to wire it into the existing `code.py` (3 lines) |
-| `pico/settings.toml.example` | Unlock secret and the power-menu switch |
+| `pico/couch_web.py` | The Pico side: a small non-blocking WebSocket server, no libraries beyond `adafruit_hid` |
+| `pico/code_example.py` | The three additions that fit it into `code.py` |
+| `pico/config_additions.py` | Optional settings for `config.py`: unlock PIN, power menu, on/off |
 | `tools/mock_pico.py` | Fake Pico for testing the page on a laptop |
 
 ## Try it without the Pico
@@ -50,18 +46,20 @@ from the next release; Settings › PHONE REMOTE shows the QR code and address
 for guests. Allow it through Windows Firewall when asked (see the
 [launcher README](https://github.com/mattixone/couch-launcher#phone-remote)).
 
-**Pico:**
+**Pico:** (optional; without it the launcher presses the keys, all but UNLOCK)
 
 1. Copy `pico/couch_web.py` to `CIRCUITPY/`.
-2. Optional, for the asleep-Beelink fallback: copy `www/index.html` to
-   `CIRCUITPY/www/index.html`. (Without it, only the launcher serves the page.)
-3. Make sure `CIRCUITPY/lib` has `adafruit_httpserver` (4.x) and `adafruit_hid`
-   (from the CircuitPython bundle, or `circup install adafruit_httpserver`).
-4. Add the three marked lines from `pico/code_example.py` to `code.py`, reusing
-   the `Keyboard` / `Mouse` / `ConsumerControl` objects it already has. Both
-   servers run in the same loop, so the Retroid's must not block (use a 0 or
-   short timeout on its sockets).
-5. Add the settings from `pico/settings.toml.example` to `settings.toml`.
+2. Use the `code.py` with the phone remote added (it's the firmware's own
+   `code.py` plus the three additions in `pico/code_example.py`). If
+   `couch_web.py` is missing or fails, the Retroid link carries on as before.
+3. Optional: add the lines from `pico/config_additions.py` to `config.py`,
+   at least `UNLOCK_PIN` for UNLOCK to work.
+
+Nothing to add to `lib`: it only needs `adafruit_hid`, which is already there.
+The phone remote listens on TCP port 80, separate from the Retroid's UDP port,
+and is polled from the same loop at most every 4 ms without ever blocking.
+Only pages served on the home network may connect (private IPs and `.local`
+names), so a website a guest has open can't reach it.
 
 The page has to be loaded over `http://`. Browsers block an `https://` page
 (e.g. GitHub Pages) from opening a plain `ws://` connection, and the Pico
@@ -74,7 +72,7 @@ can't do https, which is why the page comes from a machine on the home network.
    `couchcommander.local`) and `@self`, the launcher. Pico first only once the
    launcher has seen it answer. If one doesn't connect within a few seconds,
    the page tries the next.
-3. Served by the Pico: the Pico itself.
+3. Otherwise (the mock Pico, a laptop): whoever served the page.
 
 ## Controls
 
@@ -121,7 +119,7 @@ Phone → Pico:
 | `{"t":"key","k":["CONTROL","ALT","SHIFT","H"]}` | Press keys together, then release |
 | `{"t":"media","k":"VOLUME_INCREMENT"}` | Media key |
 | `{"t":"text","s":"hello"}` | Type text (US layout) |
-| `{"t":"unlock"}` | Type the unlock secret from `settings.toml` |
+| `{"t":"unlock"}` | Type `UNLOCK_PIN` from the Pico's `config.py` |
 | `{"t":"power","a":"sleep"}` | `sleep` / `lock` / `restart` / `shutdown` |
 | `{"t":"ping"}` | Keep-alive, every 5 s |
 
@@ -131,18 +129,18 @@ out buttons that are switched off), and `{"t":"err","msg":"…"}`.
 If the Pico disconnects, the Pico releases every key and mouse button, so a
 phone that drops mid-drag can't leave something held.
 
-## Not tested yet
+## Testing
 
-The web page and protocol are tested against `tools/mock_pico.py`. The
-CircuitPython side is written against the `adafruit_httpserver` 4.x and
-`adafruit_hid` APIs, but hasn't run on the real Pico yet. Things to check at
-home:
+- **Page**: driven in a mobile browser against `tools/mock_pico.py`.
+- **Couch Launcher's side**: its server ran on Linux with the Windows key
+  presses stubbed out, serving the page to a browser that drove it.
+- **Pico side**: the real `code.py` and `couch_web.py` ran under desktop Python
+  with the real `adafruit_hid` and stand-in USB devices, driven by the page and
+  by Retroid-style UDP packets at the same time. Every HID report checked out,
+  as did refusing foreign websites and letting go of a drag when a phone drops.
+  Not yet run on the Pico itself.
 
-- It fits alongside the existing Retroid server in `code.py`.
-- The UNLOCK timings (wake, Space, wait, type) match how the Retroid's UNLOCK
-  behaves. If the Retroid already has a working sequence, copy that into
-  `_unlock`.
-- The Win+X → U → S/R/U power sequence works on this Windows build.
-- Couch Launcher's web server is tested (run on Linux, serving the page to a
-  browser that then drove the mock Pico), but the launcher hasn't been built
-  with the .NET SDK or run on Windows with it yet.
+Worth checking on the real thing:
+
+- UNLOCK's timing (wake, Space, wait, type) on your lock screen.
+- UNLOCK pauses the Retroid for about two seconds while it types.
