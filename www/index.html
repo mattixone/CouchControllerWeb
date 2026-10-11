@@ -93,14 +93,8 @@ button:disabled { opacity: 0.35; }
 /* The tall buttons: icon over the word, so KEYBOARD fits a narrow phone. */
 .k-actions, .k-kbd { flex-direction: column; gap: 0.6em; }
 .k-actions .ico, .k-kbd .ico { font-size: 1.3em; }
-/* ENTER: the d-pad's centre, lit up so it reads as the main button. */
-.k-enter {
-  grid-area: enter; border-radius: 18px;
-  background: var(--ph); color: var(--bg); text-shadow: none;
-  box-shadow: 0 0 10px var(--glow), inset 0 0 12px color-mix(in srgb, var(--bg) 25%, transparent);
-  font-size: clamp(15px, 4.4vw, 22px) !important;
-}
-.k-enter.on, .k-enter:active { background: color-mix(in srgb, var(--ph) 70%, var(--bg)); }
+/* ENTER: the d-pad's centre; a normal button, just with bigger text. */
+.k-enter { grid-area: enter; font-size: clamp(15px, 4.4vw, 22px) !important; }
 .arrow { font-size: clamp(16px, 4.5vw, 24px) !important; }
 
 /* Volume rocker: one rounded pill split in two. */
