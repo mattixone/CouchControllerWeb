@@ -76,9 +76,15 @@ can't do https, which is why the page comes from a machine on the home network.
 
 ## Controls
 
-Same layout as the Retroid app, without FUN STUFF and GAMEPAD. The freed slot
-holds QUICKPAD, so both orientations have QUICKPAD / KEYBOARD / BACK/ESC down
-the right-hand column.
+Touchpad on top (on the right in landscape), and under it a 4×4 keypad built
+around a d-pad with a lit-up ENTER in the middle:
+
+```
+SCROLL   UNLOCK  VOL +   ACTIONS
+SCROLL     ▲     VOL −   ACTIONS
+  ◄      ENTER     ►     KEYBOARD
+PLAY/PAUSE ▼   BACK/ESC  KEYBOARD
+```
 
 - **Touchpad**: drag = move, tap = click, two-finger tap = right click,
   two-finger drag = scroll, tap then hold-and-drag = click-and-drag.
@@ -86,21 +92,23 @@ the right-hand column.
 - **D-pad, PLAY/PAUSE, BACK/ESC, VOLUME**: the same keys the Retroid sends
   (arrows, Play/Pause media key, Escape, volume media keys). Hold arrows or
   volume to repeat.
+- **ENTER**: selects, like OK on a TV remote.
 - **ACTIONS**: launcher home (`Ctrl+Alt+Shift+H`), switch apps
   (`Ctrl+Alt+Shift+S`), fullscreen, mute, tracks, YouTube keys, zoom and so on.
-- **QUICKPAD**: keys phones lack: Tab, Page Up/Down, F5, F11, Win…
 - **KEYBOARD**: types with the phone's own keyboard. LIVE sends each character
   as you type; turn it off to write a line and send it in one go.
 - **UNLOCK**: asks the Pico to type the Windows PIN/password. The secret stays
-  on the Pico, so guests never see it. Disabled if no secret is set.
+  on the Pico (`UNLOCK_PIN` in `config.py`), so guests never see it. Greyed
+  out when there's no PIN, or when the page is linked to the PC instead.
 - **POWER**: sleep / lock / restart / shut down, hold to confirm. Can be
-  switched off on the Pico (`COUCH_WEB_POWER = "0"`).
+  switched off on the Pico (`WEB_POWER = False`) and in Couch Launcher
+  (`PhoneRemotePower`).
 - **[ X ]**: closes the window on screen (Alt+F4), after a confirm.
 - **SETUP**: Pico address, pointer speed and acceleration, scroll speed,
   vibrate on press, and the same colour themes as the Retroid app. Saved per phone.
 - **LEGEND**: a plain-English guide for guests.
 
-The ACTIONS, QUICKPAD and keyboard-key lists are in the `CONFIG` block at the
+The ACTIONS and keyboard-key lists are in the `CONFIG` block at the
 top of the script in `index.html`, ready to edit.
 
 ## Protocol

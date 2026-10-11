@@ -49,8 +49,8 @@ body::after {
            max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
   display: grid; gap: var(--gap);
   grid-template-columns: 1fr;
-  grid-template-rows: auto minmax(160px, 1fr) auto auto;
-  grid-template-areas: "top" "pad" "mid" "keys";
+  grid-template-rows: auto minmax(160px, 1fr) auto;
+  grid-template-areas: "top" "pad" "keys";
 }
 
 /* ---------- buttons ---------- */
@@ -75,22 +75,32 @@ button:disabled { opacity: 0.35; }
 .top { grid-area: top; display: grid; grid-template-columns: 0.8fr 1fr 0.9fr 1.1fr; gap: var(--gap); }
 .top button { height: clamp(40px, 6dvh, 56px); font-size: clamp(13px, 3.4vw, 18px); }
 
-.mid { grid-area: mid; display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); }
-.mid button { height: clamp(52px, 8.5dvh, 90px); font-size: clamp(15px, 4.4vw, 22px); }
 
 .keys {
   grid-area: keys; display: grid; gap: var(--gap);
   grid-template-columns: repeat(4, 1fr);
-  grid-template-rows: repeat(3, clamp(62px, 11dvh, 120px));
+  grid-template-rows: repeat(4, clamp(58px, 10dvh, 112px));
   grid-template-areas:
-    "scroll play volup   quick"
-    "scroll up   voldown kbd"
-    "left   down right   back";
+    "scroll unlock volup   actions"
+    "scroll up     voldown actions"
+    "left   enter  right   kbd"
+    "play   down   back    kbd";
 }
 .keys button { font-size: clamp(12px, 3.3vw, 18px); }
 .k-play { grid-area: play; white-space: normal; text-align: center; line-height: 1.15; } .k-up { grid-area: up; } .k-left { grid-area: left; }
-.k-down { grid-area: down; } .k-right { grid-area: right; }
-.k-quick { grid-area: quick; } .k-kbd { grid-area: kbd; } .k-back { grid-area: back; }
+.k-down { grid-area: down; } .k-right { grid-area: right; } .k-back { grid-area: back; }
+.k-unlock { grid-area: unlock; } .k-actions { grid-area: actions; } .k-kbd { grid-area: kbd; }
+/* The tall buttons: icon over the word, so KEYBOARD fits a narrow phone. */
+.k-actions, .k-kbd { flex-direction: column; gap: 0.6em; }
+.k-actions .ico, .k-kbd .ico { font-size: 1.3em; }
+/* ENTER: the d-pad's centre, lit up so it reads as the main button. */
+.k-enter {
+  grid-area: enter; border-radius: 18px;
+  background: var(--ph); color: var(--bg); text-shadow: none;
+  box-shadow: 0 0 10px var(--glow), inset 0 0 12px color-mix(in srgb, var(--bg) 25%, transparent);
+  font-size: clamp(15px, 4.4vw, 22px) !important;
+}
+.k-enter.on, .k-enter:active { background: color-mix(in srgb, var(--ph) 70%, var(--bg)); }
 .arrow { font-size: clamp(16px, 4.5vw, 24px) !important; }
 
 /* Volume rocker: one rounded pill split in two. */
@@ -144,13 +154,13 @@ button:disabled { opacity: 0.35; }
 @media (orientation: landscape) and (min-width: 560px) {
   .app {
     grid-template-columns: minmax(0, 1fr) minmax(0, 0.95fr);
-    grid-template-rows: auto 1.1fr 3fr;
-    grid-template-areas: "top pad" "mid pad" "keys pad";
+    grid-template-rows: auto 1fr;
+    grid-template-areas: "top pad" "keys pad";
     max-width: 1500px; margin: 0 auto;
   }
   .top button { height: clamp(34px, 9dvh, 56px); font-size: clamp(11px, 1.6vw, 18px); }
-  .mid button { height: auto; font-size: clamp(13px, 2vw, 22px); }
-  .keys { grid-template-rows: repeat(3, 1fr); }
+  .keys { grid-template-rows: repeat(4, 1fr); }
+  .k-enter { font-size: clamp(13px, 2vw, 22px) !important; }
   .keys button { font-size: clamp(11px, 1.6vw, 18px); }
   .arrow { font-size: clamp(14px, 2.2vw, 24px) !important; }
   .pad .status { font-size: clamp(11px, 1.5vw, 16px); }
@@ -159,7 +169,7 @@ button:disabled { opacity: 0.35; }
   .scroll .lbl { font-size: clamp(10px, 1.4vw, 15px); }
 }
 
-/* ---------- sheets (ACTIONS, QUICKPAD, KEYBOARD, POWER, SETUP, LEGEND) ---------- */
+/* ---------- sheets (ACTIONS, KEYBOARD, POWER, SETUP, LEGEND) ---------- */
 .sheet {
   position: fixed; inset: 0; z-index: 50; display: none;
   background: color-mix(in srgb, var(--bg) 82%, transparent);
@@ -227,11 +237,6 @@ input[type=range] { padding: 0; border: 0; accent-color: var(--ph); background: 
     <button class="rclick" id="rclick">R-CLICK</button>
   </div>
 
-  <div class="mid">
-    <button data-open="actions"><span class="ico">&#x25C6;</span> ACTIONS</button>
-    <button id="btnUnlock"><span class="ico">&#x25C8;</span> UNLOCK</button>
-  </div>
-
   <div class="keys">
     <div class="scroll" id="scroll">
       <span class="lbl">SCROLL</span>
@@ -240,15 +245,17 @@ input[type=range] { padding: 0; border: 0; accent-color: var(--ph); background: 
         <path d="M8 16a12 12 0 0 1 4-8M6 22a17 17 0 0 1 2-10"/>
       </svg>
     </div>
-    <button class="k-play" data-media="PLAY_PAUSE"><span class="ico">&#x25B6;</span><span>PLAY/<wbr>PAUSE</span></button>
+    <button class="k-unlock" id="btnUnlock"><span class="ico">&#x25C8;</span> UNLOCK</button>
     <button class="k-volup" data-media="VOLUME_INCREMENT" data-repeat><small>VOLUME</small><b>+</b></button>
-    <button class="k-quick" data-open="quickpad"><span class="ico">&#x229E;</span> QUICKPAD</button>
+    <button class="k-actions" data-open="actions"><span class="ico">&#x25C6;</span> ACTIONS</button>
     <button class="k-up arrow" data-key="UP_ARROW" data-repeat aria-label="Up">&#x25B2;</button>
     <button class="k-voldown" data-media="VOLUME_DECREMENT" data-repeat><small>VOLUME</small><b>&minus;</b></button>
-    <button class="k-kbd" data-open="keyboard"><span class="ico">&#x25A4;</span> KEYBOARD</button>
     <button class="k-left arrow" data-key="LEFT_ARROW" data-repeat aria-label="Left">&#x25C4;</button>
-    <button class="k-down arrow" data-key="DOWN_ARROW" data-repeat aria-label="Down">&#x25BC;</button>
+    <button class="k-enter" data-key="ENTER">ENTER</button>
     <button class="k-right arrow" data-key="RIGHT_ARROW" data-repeat aria-label="Right">&#x25BA;</button>
+    <button class="k-kbd" data-open="keyboard"><span class="ico">&#x25A4;</span> KEYBOARD</button>
+    <button class="k-play" data-media="PLAY_PAUSE"><span class="ico">&#x25B6;</span><span>PLAY/<wbr>PAUSE</span></button>
+    <button class="k-down arrow" data-key="DOWN_ARROW" data-repeat aria-label="Down">&#x25BC;</button>
     <button class="k-back" data-key="ESCAPE">BACK/ESC</button>
   </div>
 </div>
@@ -257,12 +264,6 @@ input[type=range] { padding: 0; border: 0; accent-color: var(--ph); background: 
 <div class="sheet" id="sheet-actions"><div class="panel">
   <header><h2>&#x25C6; ACTIONS</h2><button data-close>CLOSE</button></header>
   <div class="grid" id="actionsGrid"></div>
-</div></div>
-
-<!-- QUICKPAD -->
-<div class="sheet" id="sheet-quickpad"><div class="panel">
-  <header><h2>&#x229E; QUICKPAD</h2><button data-close>CLOSE</button></header>
-  <div class="grid small" id="quickGrid"></div>
 </div></div>
 
 <!-- KEYBOARD -->
@@ -319,13 +320,13 @@ input[type=range] { padding: 0; border: 0; accent-color: var(--ph); background: 
     <dt>R-CLICK</dt><dd>Right click.</dd>
     <dt>SCROLL</dt><dd>Drag up and down on the strip to scroll the page.</dd>
     <dt>&#x25B2; &#x25C4; &#x25BC; &#x25BA;</dt><dd>Move around menus and the home screen. Hold to repeat.</dd>
+    <dt>ENTER</dt><dd>Selects the highlighted thing, like OK on a TV remote.</dd>
     <dt>PLAY/PAUSE</dt><dd>Plays/pauses video, and opens the highlighted tile on the home screen.</dd>
     <dt>BACK/ESC</dt><dd>Goes back, and closes the open app on the home screen.</dd>
     <dt>VOLUME</dt><dd>Turn the PC up or down. Hold to repeat.</dd>
     <dt>ACTIONS</dt><dd>Home screen, switch apps, fullscreen, mute and more.</dd>
     <dt>UNLOCK</dt><dd>Wakes the PC and gets past the lock screen. Needs the Pico, so it's greyed out when linked to the PC.</dd>
     <dt>KEYBOARD</dt><dd>Type into whatever is on screen with your phone's keyboard.</dd>
-    <dt>QUICKPAD</dt><dd>Keys a phone keyboard doesn't have: Tab, F11, Page Up and so on.</dd>
     <dt>[ X ]</dt><dd>Close the window that's on screen.</dd>
     <dt>POWER</dt><dd>Sleep, restart, shut down or lock the PC.</dd>
   </dl>
@@ -367,26 +368,6 @@ const CONFIG = {
     { label: "BROWSER BACK", keys: ["ALT", "LEFT_ARROW"] },
     { label: "SHOW DESKTOP", keys: ["GUI", "D"] },
     { label: "START MENU", keys: ["GUI"] },
-  ],
-
-  // QUICKPAD sheet: keys a phone keyboard doesn't give you.
-  quickpad: [
-    { label: "ESC", keys: ["ESCAPE"] },
-    { label: "ENTER", keys: ["ENTER"] },
-    { label: "SPACE", keys: ["SPACEBAR"] },
-    { label: "TAB", keys: ["TAB"], repeat: true },
-    { label: "SHIFT+TAB", keys: ["SHIFT", "TAB"], repeat: true },
-    { label: "ALT+TAB", keys: ["ALT", "TAB"] },
-    { label: "PAGE UP", keys: ["PAGE_UP"], repeat: true },
-    { label: "PAGE DOWN", keys: ["PAGE_DOWN"], repeat: true },
-    { label: "HOME", keys: ["HOME"] },
-    { label: "END", keys: ["END"] },
-    { label: "BACKSPACE", keys: ["BACKSPACE"], repeat: true },
-    { label: "DELETE", keys: ["DELETE"], repeat: true },
-    { label: "F5", keys: ["F5"] },
-    { label: "F11", keys: ["F11"] },
-    { label: "WIN", keys: ["GUI"] },
-    { label: "CTRL+W", keys: ["CONTROL", "W"] },
   ],
 
   // Extra keys under the KEYBOARD text box.
@@ -566,7 +547,7 @@ function tapMedia(name, quiet) {
   if (send({ t: "media", k: name }) && !quiet) log(`MEDIA » ${pretty(name)}`);
 }
 
-// Runs one CONFIG entry (action, quickpad key, power option...).
+// Runs one CONFIG entry (action, keyboard key, power option...).
 async function run(item, quiet) {
   if (item.keys) tapKeys(item.keys, quiet);
   else if (item.media) tapMedia(item.media, quiet);
@@ -657,7 +638,6 @@ $("btnClose").addEventListener("click", () => { buzz(); openSheet("closewin"); }
 $("closeYes").addEventListener("click", () => { tapKeys(["ALT", "F4"]); closeSheets(); });
 
 buildGrid($("actionsGrid"), CONFIG.actions, { closeAfter: true });
-buildGrid($("quickGrid"), CONFIG.quickpad);
 buildGrid($("kbKeys"), CONFIG.keyboardKeys);
 buildGrid($("powerGrid"), CONFIG.power, { hold: true });
 
