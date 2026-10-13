@@ -1,10 +1,13 @@
 # couch_web.py: the phone remote (CouchControllerWeb), Pico side.
 #
-# A small WebSocket server on TCP port 80 that takes the phone page's button
-# presses and turns them into USB HID input, alongside the Retroid's UDP link.
-# Couch Launcher serves the page itself; this only takes the presses, which
-# beats the launcher pressing keys from Windows because a real USB keyboard
-# also works on the lock screen (UNLOCK).
+# A small server on TCP port 80 that takes the phone page's button presses
+# over a WebSocket and turns them into USB HID input, alongside the Retroid's
+# UDP link. A real USB keyboard also works on the lock screen (UNLOCK).
+#
+# It serves the page too, from /www/index.html.gz (or index.html) on the
+# drive, so the remote still loads when the Beelink is asleep, restarting or
+# at the sign-in screen and Couch Launcher isn't running. The page is sent in
+# small slices, one per poll, so a guest loading it never holds up the Retroid.
 #
 # No libraries beyond adafruit_hid, and nothing here ever blocks: code.py
 # calls poll() from its receive loop and it returns straight away when there's
@@ -15,6 +18,7 @@
 #     ...in the loop:  web.poll()
 
 import json
+import os
 import time
 
 try:
@@ -32,7 +36,10 @@ from adafruit_hid.keycode import Keycode
 from adafruit_hid.consumer_control_code import ConsumerControlCode
 from adafruit_hid.mouse import Mouse
 
-MAX_CLIENTS = 3          # phones at once; sockets are scarce on the Pico
+MAX_CLIENTS = 4          # connections at once (pages loading + phones); sockets are scarce
+PAGE_FILES = ("/www/index.html.gz", "/www/index.html")
+SLICE = 1024             # bytes of page sent per poll per client
+PAGE_TIMEOUT_NS = 10_000_000_000
 MAX_MOVE = 400           # px per message, so a glitch can't fling the pointer
 MAX_TEXT = 300           # characters per text message
 POLL_EVERY_NS = 4_000_000  # look for web traffic at most every 4 ms
@@ -115,6 +122,8 @@ class _Client:
         self.buf = b""
         self.open = False  # handshake done
         self.since = time.monotonic_ns()
+        self.file = None   # page being sent, when this is a page load
+        self.pending = b""
 
 
 class CouchWeb:
@@ -153,7 +162,11 @@ class CouchWeb:
         self._accept()
         for client in list(self.clients):
             try:
-                self._read(client, now)
+                if client.file is not None or client.pending:
+                    if self._pump(client) or now - client.since > PAGE_TIMEOUT_NS:
+                        self._drop(client)
+                else:
+                    self._read(client, now)
             except OSError:
                 self._drop(client)
 
@@ -166,7 +179,10 @@ class CouchWeb:
         client = _Client(sock)
         self.clients.append(client)
         if len(self.clients) > MAX_CLIENTS:
-            self._drop(self.clients[0])
+            # Make room by dropping a page load that never finished before
+            # anyone's live connection.
+            idle = [c for c in self.clients if not c.open]
+            self._drop((idle or self.clients)[0])
 
     def _read(self, client, now):
         try:
@@ -203,9 +219,33 @@ class CouchWeb:
                 raise
             view = view[sent:]
 
+    def _pump(self, client):
+        """Send the next slice of a page. True once it has all gone."""
+        while True:
+            if not client.pending:
+                chunk = client.file.read(SLICE) if client.file else b""
+                if not chunk:
+                    return True
+                client.pending = chunk
+            try:
+                sent = client.sock.send(client.pending)
+            except OSError as exc:
+                if _no_data(exc):
+                    return False  # socket full; carry on next poll
+                raise
+            client.pending = client.pending[sent:]
+            if client.pending:
+                return False
+
     def _drop(self, client):
         if client in self.clients:
             self.clients.remove(client)
+        if client.file is not None:
+            try:
+                client.file.close()
+            except Exception:
+                pass
+            client.file = None
         try:
             client.sock.close()
         except Exception:
@@ -234,7 +274,9 @@ class CouchWeb:
         path = parts[1].split("?", 1)[0] if len(parts) > 1 else ""
         key = headers.get("sec-websocket-key")
         if path != "/ws" or headers.get("upgrade", "").lower() != "websocket" or not key:
-            body = b"Couch Commander phone remote: open it from Couch Launcher.\n"
+            if parts[0] == "GET" and path in ("/", "/index.html") and self._serve_page(client):
+                return
+            body = b"Not found\n"
             self._send(client, b"HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: "
                        + str(len(body)).encode() + b"\r\nConnection: close\r\n\r\n" + body)
             self._drop(client)
@@ -251,6 +293,25 @@ class CouchWeb:
         self._reply(client, {"t": "hello", "name": "couchcommander",
                              "power": bool(self.allow_power and self.do_power),
                              "unlock": bool(self.unlock_secret)})
+
+    def _serve_page(self, client):
+        """Start sending the page; it goes out slice by slice from poll().
+        False if there's no page file on the drive."""
+        for name in PAGE_FILES:
+            try:
+                size = os.stat(name)[6]
+                client.file = open(name, "rb")
+            except OSError:
+                continue
+            head = ("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n"
+                    "Content-Length: %d\r\nCache-Control: no-cache\r\nConnection: close\r\n"
+                    % size)
+            if name.endswith(".gz"):
+                head += "Content-Encoding: gzip\r\n"
+            client.pending = (head + "\r\n").encode()
+            client.since = time.monotonic_ns()
+            return True
+        return False
 
     def _frames(self, client):
         buf = client.buf
