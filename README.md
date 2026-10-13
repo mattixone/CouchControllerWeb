@@ -20,6 +20,12 @@ The status line shows `LINKED PICO` or `LINKED PC`. The launcher checks for the
 Pico in the background and tells the page to try it first once it answers.
 None of this touches the Retroid's link to the Pico.
 
+**The Pico serves the page too**, at `http://<pico-ip>` or
+`http://couchcommander.local`. That's the one to use when the Beelink is
+asleep, restarting or at the sign-in screen: Couch Launcher isn't running then,
+but the Pico always is, so you can open the page and press a button (a
+keypress wakes the PC; UNLOCK gets past the lock screen).
+
 ## What's here
 
 | Path | What it is |
@@ -27,6 +33,8 @@ None of this touches the Retroid's link to the Pico.
 | `www/index.html` | The whole web app: one file, no build step, no internet needed. Couch Launcher ships a copy of it |
 | `pico/couch_web.py` | The Pico side: a small non-blocking WebSocket server, no libraries beyond `adafruit_hid` |
 | `pico/code_example.py` | The three additions that fit it into `code.py` |
+| `pico/www/index.html.gz` | The page, pre-compressed for the Pico to serve (rebuilt by `tools/build_pico_page.py`) |
+| `tools/build_pico_page.py` | Regenerates `pico/www/index.html.gz` from `www/index.html` |
 | `pico/config_additions.py` | Optional settings for `config.py`: unlock PIN, power menu, on/off |
 | `tools/mock_pico.py` | Fake Pico for testing the page on a laptop |
 
@@ -48,7 +56,10 @@ for guests. Allow it through Windows Firewall when asked (see the
 
 **Pico:** (optional; without it the launcher presses the keys, all but UNLOCK)
 
-1. Copy `pico/couch_web.py` to `CIRCUITPY/`.
+1. Copy `pico/couch_web.py` to `CIRCUITPY/`, and `pico/www/index.html.gz` to
+   `CIRCUITPY/www/index.html.gz` (make the `www` folder). That's the page the
+   Pico serves. After changing `www/index.html`, run
+   `python3 tools/build_pico_page.py` and copy the new `.gz` over.
 2. Use the `code.py` with the phone remote added (it's the firmware's own
    `code.py` plus the three additions in `pico/code_example.py`). If
    `couch_web.py` is missing or fails, the Retroid link carries on as before.
@@ -57,7 +68,10 @@ for guests. Allow it through Windows Firewall when asked (see the
 
 Nothing to add to `lib`: it only needs `adafruit_hid`, which is already there.
 The phone remote listens on TCP port 80, separate from the Retroid's UDP port,
-and is polled from the same loop at most every 4 ms without ever blocking.
+and is polled from the same loop at most every 4 ms without ever blocking. The
+page goes out 1 KB per poll, so loading it never holds up the Retroid. Give the
+Pico a fixed address in your router (a DHCP reservation) so the address you
+bookmark never changes.
 Only pages served on the home network may connect (private IPs and `.local`
 names), so a website a guest has open can't reach it.
 
@@ -72,7 +86,7 @@ can't do https, which is why the page comes from a machine on the home network.
    `couchcommander.local`) and `@self`, the launcher. Pico first only once the
    launcher has seen it answer. If one doesn't connect within a few seconds,
    the page tries the next.
-3. Otherwise (the mock Pico, a laptop): whoever served the page.
+3. Served by the Pico (or the mock Pico): whoever served the page.
 
 ## Controls
 
